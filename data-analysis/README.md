@@ -1,14 +1,8 @@
-# TO DO
+# Description of scripts
 
-1. Make sure setup_blips is easy to follow
+1. setup_data.R - process the data to identify infection episodes (transient infections) with duration.
 
-2. Why are there so many data files?
-
-# Order of documents
-
-1. setup_blips.R
-
-2. CMV_blip_descriptives.Rmd -> Basic descriptives for CMV, compares blips and infection
+2. CMV_transient_descriptives.Rmd -> Basic descriptives for CMV, compares transient infections and primary infection
 
 3. CMV_blip_comparison.Rmd  -> Basic descriptives all viruses, compares percent positive, frequencies. Also compares blips to demographic variables.
 

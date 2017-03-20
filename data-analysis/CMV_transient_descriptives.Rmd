@@ -1,0 +1,221 @@
+---
+title: "CMV transient infection descriptives"
+output: html_document
+---
+This file does the descriptive analysis of the CMV transient infections (blips):    
+1)Look at an example    
+2)Look at the duration    
+3)Look at the size    
+4)Save the figure 1    
+
+```{r load data and packages, echo = F, warning = F, message = F}
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(cowplot)
+library(scales)
+library(knitr)
+theme_set(theme_bw())
+
+load("data/infected_blip_data.RData")
+load("data/duration_data.RData")
+infantCMVdata =  readr::read_csv("data/raw_data.csv") %>% subset(Virus == "ORL_CMV") 
+cmv_title = expression(paste("Log"[10], " CMV DNA copies/swab"))
+```
+
+##1. Make example plots
+```{r example plot, echo=FALSE}
+##### look at CMV data ########
+if(F){ #there is no need to run this more than once
+  raw_data_plot = llply(unique(CMVblipdata$PatientID2), function(pid){
+    ggplot(data = subset(CMVblipdata, PatientID2 == pid), aes(x = days, y = count + 0.01)) +
+      scale_y_continuous("count") +
+      geom_line() +
+      geom_point(size = 3, colour = "red") +
+      ggtitle(pid)
+
+  })
+
+
+}
+
+#---------- Plots Example of blips and infection: Figure 1A ####
+example_ids = c("AY-P", "AS-P", "AI-P", "AK-P")
+
+
+example_subset = subset(infantCMVdata, PatientID2 %in% example_ids)
+example_subset$PatientID2 = factor(example_subset$PatientID2, levels = example_ids)
+#infected on last day
+example_subset$infantInfection[example_subset$PatientID2 == "AS-P"] = 0  
+
+example_subset = example_subset %>% group_by(PatientID2) %>% mutate(max_time = max(times))
+
+example_subset$final_date = with(example_subset, ifelse(infantInfection == 1, infantInfDate, max_time))
+example_subset = example_subset %>% group_by(PatientID2) %>%
+  mutate(final_day = days[which(times == final_date)],
+         day_lag = lag(days),
+         count_lag = lag(count))
+example_subset$final_day = with(example_subset, ifelse(infantInfection == 1, final_day, final_day + 1))
+
+example_subset$infection =  with(example_subset, days >= final_day)
+
+example_subset = subset(example_subset, days < 365)
+
+example_plot = ggplot(data = example_subset,
+                      aes(x = days, y = count + 0.01, colour = factor(infection))) +
+  scale_y_continuous(cmv_title, breaks = 0:4 * 2) +
+  geom_line(data = subset(example_subset, infection == 1 & (day_lag <= final_day)), 
+            aes(x = day_lag, y= count_lag)) +
+  geom_line() +
+  scale_x_continuous("Observation day") +
+  scale_color_manual(guide = F, values = rev(c("#969696", "Black"))) +
+  geom_point(size = 1.5) +
+  facet_wrap(~PatientID2, ncol = 2, nrow = 2) +
+  theme(text = element_text(size = 20),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1),
+        strip.text = element_blank())
+
+example_plot
+
+
+
+#break example plot into two groups
+example_plot1_raw = ggplot(data = subset(example_subset, PatientID2 %in% example_ids[1:2]),
+                      aes(x = days, y = count + 0.01, colour = factor(infection))) +
+  scale_y_continuous(cmv_title, breaks = 0:9, limits = c(0, 9)) +
+  #geom_line(data = subset(example_subset, infection == 1 & (day_lag <= final_day)), 
+  #          aes(x = day_lag, y= count_lag)) +
+  geom_line() +
+  scale_x_continuous("Observation day", breaks = 0:9 * 50) +
+  scale_color_manual(guide = F, values = rev(c("#969696", "Black"))) +
+  geom_point(size = 1.5) +
+  facet_wrap(~PatientID, ncol = 2, nrow = 2)
+
+example_plot1 = example_plot1_raw +
+  theme(text = element_text(size = 16),
+        axis.text.x = element_text(size = 10),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1),
+        strip.text = element_blank())
+
+example_plot2_raw = ggplot(data = subset(example_subset, PatientID2 %in%  example_ids[3:4]),
+                      aes(x = days, y = count + 0.01, colour = factor(infection))) +
+  scale_y_continuous(cmv_title, breaks = 0:9, limits = c(0, 9)) +
+  geom_line(data = subset(example_subset, infection == 1 & (day_lag <= final_day)), 
+            aes(x = day_lag, y= count_lag)) +
+  geom_line() +
+  facet_wrap(~PatientID2, ncol = 2, nrow = 2) +
+  scale_x_continuous("Observation day", breaks = 0:9 * 50) +
+  scale_color_manual(guide = F, values = rev(c("#969696", "Black"))) +
+  geom_point(size = 1.5) 
+
+example_plot2 = example_plot2_raw +
+  theme(text = element_text(size = 16),
+        axis.text.x = element_text(size = 10),
+        axis.line = element_line(colour = "black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1),
+        strip.text = element_blank())
+
+```
+
+##2. Analyze duration times
+
+### All blips
+```{r duration plot all, echo=FALSE}
+#breakdown of censored durations
+duration_data_all = blip_data_duration %>% ungroup() %>% mutate(total_episodes = n()) %>% 
+  group_by(total_blips) %>%
+  summarize(
+    total = unique(total_episodes),
+    total_duration = n(),
+    prop = total_duration/total
+    )
+
+duration_data_all %>% kable()
+
+duration_pl_all = ggplot(data = duration_data_all, aes(x = total_blips, y = prop)) +
+  geom_bar(stat = "identity", fill = "black") +
+  scale_x_discrete("Approximate duration (day range)", limits = 1:4, 
+                   labels = c("1-13", "8-20", "15-27", "22-34")) +
+  scale_y_continuous("Proportion of CMV transient infections ", breaks = 0:4/4) +
+  #scale_fill_manual(guide = F, values = brewer.pal(6, "OrRd")[c(-2, -6)]) +
+  theme(text = element_text(size = 16),
+        axis.title.y = element_text(size = 15),
+        axis.title.x = element_text(size = 12),
+        axis.text.x = element_text(size = 13))
+
+duration_pl_all
+
+```
+
+
+### Using censoring rules
+```{r duration plot, echo=FALSE}
+#breakdown of censored durations
+duration_data = blip_data_duration_complete %>% ungroup() %>% mutate(total_episodes = n()) %>% 
+  group_by(total_blips) %>%
+  summarize(
+    total = unique(total_episodes),
+    total_duration = n(),
+    prop = total_duration/total
+    )
+
+duration_data %>% kable()
+
+duration_pl_raw = ggplot(data = duration_data, aes(x = total_blips, y = prop)) +
+  geom_bar(stat = "identity", fill = "black") +
+  scale_x_discrete("Duration (day range)", limits = 1:4, 
+                   labels = c("1-13", "8-20", "15-27", "22-34"), expand = c(0.05,0.05)) +
+  scale_y_continuous("Proportion of CMV transient infections ", breaks = 0:4/4) 
+  #scale_fill_manual(guide = F, values = brewer.pal(6, "OrRd")[c(-2, -6)]) +
+duration_pl = duration_pl_raw + theme(text = element_text(size = 16),
+        axis.title.y = element_text(size = 15),
+        axis.title.x = element_text(size = 14),
+                axis.text.x = element_text(size = 11))
+
+duration_pl
+
+```
+
+### Look at censoring
+```{r censoring exlusions, echo = F}
+#this comes from setup_blips.R
+blip_data_duration %>% ungroup() %>%
+  summarize(
+    total = n(),
+    included = sum(min_day_diff >= 5 & max_day_diff <= 9),
+    lt5only = sum(min_day_diff < 5 & max_day_diff <= 9),
+    gt9only = sum(max_day_diff > 9 & min_day_diff >= 5),
+    both = sum(min_day_diff < 5 & max_day_diff > 9)
+      ) %>%
+  kable()
+
+```
+
+##3. Analyze viral load
+```{r viral load, echo=FALSE}
+
+subset(swab_size_data, max_size > 0) %>% group_by(type) %>%
+  summarize(
+    total = n(),
+    mean_max = mean(max_size),
+    median_max = median(max_size),
+    IQR = paste(quantile(max_size, c(0.25, 0.75)), collapse = ", "),
+    range = paste(range(max_size), collapse = ", ")
+  ) %>% kable()
+
+#Figure 2D#
+swab_size_pl_raw = ggplot(data = subset(swab_size_data, max_size > 0), aes(x = type, y = max_size)) + geom_boxplot() +
+  scale_x_discrete("Maximum conc.", labels = c("Transient\ninfection", "Primary\ninfection"), expand = c(0.05,0.05)) +
+  scale_y_continuous(cmv_title, breaks = 1:9) 
+
+swab_size_pl = swab_size_pl_raw +
+  theme(text = element_text(size = 16),
+        axis.title.y = element_text(size = 15),
+        axis.title.x = element_text(size = 14),
+        axis.text.x = element_text(size = 12))
+
+swab_size_pl
+
+```
