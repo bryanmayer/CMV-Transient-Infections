@@ -1,0 +1,238 @@
+---
+title: "Comparison of transient infections across viruses and covariates"
+output: html_document
+---
+
+This file does the comparisons analysis of the CMV transient infections between other viruses, infants with primary infection or not, and with breastfeeding.
+1) Compare viruses       
+2) Compare by infection status    
+3) Compare by breastfeeding 
+
+```{r load data and packages, echo = F, warning = F, message = F}
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(cowplot)
+library(scales)
+library(knitr)
+library(geepack)
+library(readr)
+
+theme_set(theme_bw())
+
+load("data/all_blip_data.RData")
+
+```
+
+## Setup the data
+```{r data setup}
+
+blip_rates = arrange(all_blips, Virus, PatientID2) %>% group_by(Virus, PatientID2) %>%
+  dplyr::summarize(blip_total = sum(count > 0),
+                   total_swabs = n(),
+                   infected = infantInfection[1],
+                   total_time = as.numeric(difftime(max(times), min(times), units = "days")))
+
+blip_rates$inf_label = factor(ifelse(blip_rates$infected == 1, "Yes", "No"),
+                              levels = rev(c("Yes", "No")))
+blip_rates$blip_prop = with(blip_rates, blip_total/total_swabs)
+
+```
+
+##1.) By virus
+
+```{r viral comparisons, echo=FALSE}
+
+blip_rates$Virus = factor(blip_rates$Virus, ordered = T)
+blip_rates$Virus = with(blip_rates, reorder(Virus, -blip_prop))
+
+blip_rates %>% group_by(Virus) %>% summarize(
+    total = n(),
+    mean = mean(round(blip_prop, 2)),
+    median = median(round(blip_prop, 2)),
+    IQR = paste(quantile(round(blip_prop, 2), c(0.25, 0.75)), collapse = ", "),
+    range = paste(range(round(blip_prop, 2)), collapse = ", ")
+) %>% kable()
+
+virus_prop_raw = ggplot(data = blip_rates,  aes(x = reorder(Virus, -blip_prop), y = blip_prop)) +
+  geom_boxplot(fill = "grey") +
+  scale_y_continuous("Proportion of swabs positive for viral DNA", limits = c(0, 0.7), breaks = 0.1 * 0:7) +
+  scale_x_discrete("Virus", labels = c("CMV", "EBV", "HSV", "HHV-8", "HHV-6")) 
+
+virus_prop = virus_prop_raw+
+  theme(
+    text = element_text(size = 15),
+    axis.title.y = element_text(size = 12),
+    axis.title.x = element_blank())
+
+virus_prop
+
+```
+
+
+##2. By infant infection status
+
+### all viruses
+```{r infant infection comparisons, echo=FALSE}
+blip_rates %>% group_by(Virus, inf_label) %>% summarize(
+    total = n(),
+    mean = mean(round(blip_prop, 2)),
+    median = median(round(blip_prop, 2)),
+    IQR = paste(quantile(round(blip_prop, 2), c(0.25, 0.75)), collapse = ", "),
+    range = paste(range(round(blip_prop, 2)), collapse = ", ")
+) %>% kable()
+
+
+all_prop_raw = ggplot(data = subset(blip_rates, Virus != 'HHV8'),  aes(x = Virus, y = blip_prop, fill = inf_label)) +
+  geom_boxplot() +
+  scale_y_continuous("Proportion of swabs positive for viral DNA", limits = c(0, 0.7), breaks = 0.1 * 0:7) +
+  scale_fill_discrete("Primary infection\nobserved")+
+   guides(fill=guide_legend(nrow=1, ncol = 2, title.position = "top", byrow = F)) 
+
+
+all_prop = all_prop_raw+
+  theme(
+    legend.position = c(0.75, 0.65/0.7),
+    text = element_text(size = 15),
+    legend.text = element_text(size = 12), 
+    axis.title.y = element_text(size = 12),
+    axis.title.x = element_blank(),
+    legend.background = element_blank())
+all_prop
+
+```
+
+### CMV only
+```{r infant infection comparisons cmv only, echo=FALSE}
+subset(blip_rates, Virus == "CMV") %>% group_by(inf_label) %>% summarize(
+    total = n(),
+    mean = mean(round(blip_prop, 2)),
+    median = median(round(blip_prop, 2)),
+    IQR = paste(quantile(round(blip_prop, 2), c(0.25, 0.75)), collapse = ", "),
+    range = paste(range(round(blip_prop, 2)), collapse = ", ")
+) %>% kable()
+
+
+CMV_prop = ggplot(data = subset(blip_rates, Virus == "CMV"),  aes(x = inf_label, y = blip_prop)) +
+  geom_boxplot(fill = alpha("grey", 0.75)) +
+  scale_y_continuous("Proportion of swabs positive for CMV DNA", limits = c(0, 0.7), breaks = 0.1 * 0:7) +
+  scale_x_discrete("CMV infection") +
+  theme(
+    text = element_text(size = 15),
+    axis.title.y = element_text(size = 12))
+
+CMV_prop
+
+```
+
+##3. Breastfeeding data
+
+Note that consecutive positives are removed.
+
+```{r bf analysis, echo = F, warning = F}
+ts_covariates = readr::read_csv("data/demographics_data.csv")
+
+#extract negative swabs and then start of transient infections
+cmv_blip_period =  subset(all_blips, Virus == "CMV") %>% 
+    filter(!consecutive_swab | is.na(consecutive_swab)) %>% filter(pos) %>%
+  bind_rows(subset(all_blips, Virus == "CMV" & !pos)) 
+
+bf_pos_swabs = left_join(cmv_blip_period, ts_covariates, by =  c("PatientID2", "times")) %>%
+  group_by(PatientID2) %>%
+  mutate(
+    breastfed_ever = max(breastfed),
+    saliva_ever = max(saliva),
+    chewfood_ever = max(chewfood)
+  ) 
+
+agg_function = function(var){
+  subset(bf_pos_swabs, !is.na(get(var))) %>% group_by_(var) %>%
+    dplyr::summarize(blip_total = sum(count > 0),
+                     total_swabs = n(),
+                     blip_prop = blip_total/total_swabs)
+}
+
+population_rates = bf_pos_swabs %>%
+  group_by(PatientID2, breastfed_ever, saliva_ever, chewfood_ever) %>%
+  summarize(
+    blip_total = sum(count > 0),
+    total_swabs = n(),
+    blip_prop = blip_total/total_swabs
+  ) %>%
+  reshape2::melt(measure.vars = c("breastfed_ever", "saliva_ever", "chewfood_ever")) %>%
+  group_by(variable) %>%
+  mutate(
+    total = n(),
+    prop = mean(value)
+  ) %>%
+    group_by(variable, value, prop) %>%
+  summarize(
+    median_swabs = median(total_swabs),
+    median_blip_prop = median(blip_prop),
+    blip_prop_population = sum(blip_total)/sum(total_swabs)
+  )
+
+no_breastfeed_data = bf_pos_swabs %>%
+  group_by(PatientID2) %>%
+  mutate(
+    no_bf_end_day = if(unique(breastfed_ever)) min(days[breastfed == 1]) else 
+      max(days) + 1
+  ) %>%
+  subset(days < no_bf_end_day)
+
+#any(no_breastfeed_data$breastfed)
+#mean(no_breastfeed_data$count > 0)
+#mean(subset(no_breastfeed_data, !breastfed_ever)$count > 0)
+#no_breastfeed_data %>% group_by(PatientID2) %>% summarize(blip_prop = sum(count > 0)/n()) %>% summarize(mean_prop = mean(blip_prop))
+
+
+covariate_rates = plyr::ldply(c("breastfed", "saliva", "chewfood"), function(x) {
+  out = agg_function(x)
+  z = which(colnames(out) == x)
+  out$value = as.numeric(as.matrix((as.data.frame(out[, z]))))
+  out$var = x
+  out[, -z]
+})
+
+
+select(covariate_rates, var, value, everything()) %>% ungroup() %>% kable(caption="Not by patient, by positive swab status")
+
+ungroup(population_rates) %>% kable(caption="Positive swab proportion by patient. (population = pooled proportion).")
+
+```
+
+
+```{r episode infection breastfeeding comparison}
+
+bf_pos_swabs_all =  subset(all_blips, Virus == "CMV") %>%
+  left_join(ts_covariates, by =  c("PatientID2", "times")) %>%
+  group_by(PatientID2) %>%
+  mutate(
+    breastfed_ever = max(breastfed, na.rm = T), #there is a missing during a transient infection
+    saliva_ever = max(saliva),
+    chewfood_ever = max(chewfood)
+  ) 
+
+all_swab_rates = bf_pos_swabs_all %>%
+  group_by(PatientID2, breastfed_ever, saliva_ever, chewfood_ever) %>%
+  summarize(
+    blip_total = sum(count > 0),
+    total_swabs = n(),
+    blip_prop = blip_total/total_swabs
+  ) %>%
+  reshape2::melt(measure.vars = c("breastfed_ever", "saliva_ever", "chewfood_ever")) %>%
+  group_by(variable) %>%
+  mutate(
+    total = n(),
+    prop = mean(value)
+  ) %>%
+    group_by(variable, value, prop) %>%
+  summarize(
+    median_swabs = median(total_swabs),
+    median_blip_prop = median(blip_prop),
+    blip_prop_population = sum(blip_total)/sum(total_swabs)
+  )
+
+ungroup(all_swab_rates) %>% kable(caption="Positive swab proportion by all swabs. (population = pooled proportion).")
+
+```
