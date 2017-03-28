@@ -1,0 +1,56 @@
+---
+title: "Package information"
+output: pdf_document
+---
+
+```{r setup,  echo = F, results="asis", message = F, warning = F}
+
+
+library(RCurl)
+library(knitr)
+library(broom)
+library(readr)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(RColorBrewer)
+library(scales)
+library(cowplot)
+library(deSolve)
+library(survival)
+library(geepack)
+
+library(data.table)
+library(xtable)
+
+
+my_session_info <- devtools::session_info()
+
+platform <- my_session_info[[1]]
+packages <- my_session_info[[2]]
+
+# TABLE 1
+my_session_info1 <- data.table::data.table(
+  name = names(platform),
+  value = matrix(unlist(platform), nrow = length(platform)))
+
+names(my_session_info1)[2] <- "Session info."
+
+xtab <- xtable(x = my_session_info1,
+               caption = 'Reproducibility Software Session Information',
+               label = 'session_info')
+print(xtab, include.rownames = FALSE, include.colnames = FALSE, size = "\\footnotesize")
+
+
+# TABLE 2
+my_session_info2 <- as.data.frame(
+  matrix(unlist(packages), ncol = length(packages))
+) %>% select(-V2) # Only want attached packages
+names(my_session_info2) = names(packages)[-2]
+
+# Adding in Data Versions
+
+xtab <- xtable(x = my_session_info2, caption = 'Reproducibility Software Package Version Information', label = 'session_info2')
+print(xtab, include.rownames = FALSE, size = "\\footnotesize", sanitize.text.function=function(x){x})
+```
