@@ -21,13 +21,28 @@ theme_set(theme_bw())
 
 cmv_title = expression(paste("Log"[10], " CMV DNA copies/swab"))
 
+#which parameters are shown on the plots
+r0_plot_range = c(1.1, 1.3, 1.5)
+initI_plot_range =  c(1, 3, 7, 10)
+
+
+#if you change initI_plot_range, this should be updated
+Ilabels = c(expression(paste(I[0], " = 1")),
+            expression(paste(I[0], " = 3")),
+            expression(paste(I[0], " = 7")),
+            expression(paste(I[0], " = 10")))
+
 ```
 
 
 ```{r load data}
 
-### The transient infection data
+### The transient infection data - used for viral loads
 load("../data-analysis/data/cmv_blip_data.RData")
+
+### The transient infection duration data - used for consecutive swabs
+load("../data-analysis/data/duration_data.RData")
+
 
 ### The batch simulation data stored on dataverse.
 
@@ -44,7 +59,7 @@ if("stochastic_sim_I_latent.Rdata" %in% list.files("model-data/")){
 
 ## Summary of primary infection model fits
 
-These are the results from fitting the CMV infection model (deterministic ode model) to the primary infection data on just the exponential viral expansion portion of the data. (This analysis and data is available on github)[https://github.com/bryanmayer/CMV-Primary-Analysis]. This results file shows the fitted parameter for infection start time (relative to first positive), beta x initial susceptible cells (4e8) x 1000, and the subsequent calculation of R0.
+These are the results from fitting the CMV infection model (deterministic ode model) to the primary infection data on just the exponential viral expansion portion of the data. [That analysis and data is available on github](https://github.com/bryanmayer/CMV-Primary-Analysis). This results file shows the fitted parameter for infection start time (relative to first positive), beta x initial susceptible cells (4e8) x 1000, and the subsequent calculation of R0.
 
 ```{r results from primary model}
 
@@ -109,43 +124,29 @@ write_csv(sim_blip_rate_lag_obs, "model-data/contour_plot_data.csv")
 
 ```
 
+### Transient infection viral loads
 
-```{r, eval = F}
+Comparing the randomly sampled viral concentrations from the model simulations to the values that are actually observed in the data.
 
-########## FIGURE 4, size of blips###########
+```{r plot of transient infection viral loads}
 
 blip_size_data = select(subset(CMVblipdata, count > 0), count)
-summary(blip_size_data)
 
-plot_data = subset(sim_blips_lag_obs, round(R0, 2) %in% c(1.1, 1.3, 1.5) &
-                     (initI %in% c(1, 3, 7, 10)))
+# subset the simulation datafor plotting
+plot_data = subset(sim_blips_lag_obs, 
+                   round(R0, 2) %in% r0_plot_range &
+                     (initI %in% initI_plot_range))
+
 plot_data$R0 = round(plot_data$R0, 2)
+
+# this is the observed data reorganized with common variables names for with against simulation data
 bind_data = data.frame(
   R0 = "data",
-  initI = rep(c(1, 3, 7, 10), each = length(blip_size_data$count)),
+  initI = rep(initI_plot_range, each = length(blip_size_data$count)),
   max_V = 10^blip_size_data$count,
   random_blip_sample = 10^blip_size_data$count,
   max_V = 10^blip_size_data$count
 )
-plot_data2 = rbind.fill(bind_data, plot_data)
-plot_data2$R0 = factor(plot_data2$R0, levels = c("data", "1.1", "1.3", "1.6", "2"), ordered = T)
-
-blip_size_pl = ggplot(data = plot_data2,
-                      aes(x = R0, y = log10(random_blip_sample))) +
-  geom_boxplot(fill = alpha("grey", 0.75)) +
-  geom_boxplot(data = subset(plot_data2, R0 == "data"), colour = "red", outlier.colour = "red", fill = alpha("red", 0.25)) +
-  scale_x_discrete(expression(paste(R[0])), drop = F) +
-  scale_y_continuous(cmv_title, expand = c(0, 0), limits = c(0.75, 6.5), breaks = 1:6) +
-  #geom_text(data = plot_data2 %>% group_by(initI, R0) %>% dplyr::summarize(total = sum(observed)),
-  #          aes(label = total, y = -Inf), vjust = -0.2, size = 4) +
-  facet_wrap(~initI, ncol = 2) +
-  theme(text = element_text(size = 25),
-        axis.text.x = element_text(angle = 90, vjust = 0.5, colour = c("red", rep("black",12))),
-        strip.background = element_rect(fill = NA))
-
-ggsave("~/Dropbox/CMV blips/Paper_Figures/simblip_size_plot.pdf", blip_size_pl, width = 9, height = 7)
-
-#### remaking figure 4 fo publication
 
 data_size_summary = bind_data %>% group_by(R0, initI) %>%
   summarize(
@@ -153,21 +154,16 @@ data_size_summary = bind_data %>% group_by(R0, initI) %>%
     lowerQR = quantile(log10(random_blip_sample), 0.25),
     upperQR = quantile(log10(random_blip_sample), 0.75)
   )
-
-
-Ilabels = c(expression(paste(I[0], " = 1")),
-            expression(paste(I[0], " = 3")),
-            expression(paste(I[0], " = 7")),
-            expression(paste(I[0], " = 10")))
-            
+  
+#label the initI
 plot_data$icat = factor(plot_data$initI, levels = c(1,3,7,10),
                         labels =Ilabels)
 data_size_summary$icat = factor(data_size_summary$initI, levels = c(1,3,7,10),
                                 labels =Ilabels)
-  
 
+## make plot
 line_col = "#F8766D"
-fig4 = ggplot(data = plot_data,
+ggplot(data = plot_data,
                       aes(x = factor(R0), y = log10(random_blip_sample))) +
   geom_boxplot(fill = "white") +
   geom_hline(data = data_size_summary, aes(yintercept = median_conc), colour= line_col) +
@@ -177,77 +173,79 @@ fig4 = ggplot(data = plot_data,
   scale_y_continuous(cmv_title, limits = c(1.9, 5), breaks = 1:6) +
   facet_wrap(~icat, nrow = 1, labeller = label_parsed)
 
-# blip_max_pl = ggplot(data = plot_data2,
-#                      aes(x = R0, y = log10(max_V))) +
-#   geom_boxplot() +
-#   geom_boxplot(data = subset(plot_data2, R0 == "data"), colour = "red", outlier.colour = "red") +
-#   scale_x_discrete("R0", drop = F) +
-#   scale_y_continuous("Maximum log10 viral load from blip", expand = c(0, 0), limits = c(1.5, 6.5), breaks = 1:6) +
-#   facet_wrap(~initI, ncol = 2) +
-#   theme(text = element_text(size = 25),
-#         axis.text.x = element_text(angle = 90, vjust = 0.5, colour = c("red", rep("black",12))))
 
-#cowplot::plot_grid(blip_size_pl, blip_max_pl, nrow = 2)
+data_size_summary[1,] %>% ungroup() %>%
+  select(median_conc, lowerQR, upperQR) %>%
+  kable(caption = "Summary of observed transient infection viral load data.")
 
-########## Supplementary Figure, duration of simulations  ###############
+```
 
-plot_data$wks =  plot_data$max_time/7
-plot_data$log_wks =  log10(plot_data$max_time/7)
-summary(plot_data$wks)
-summary(plot_data$log_wks)
+### Comparing duration between simulations and observed.
 
-duration_plot = ggplot(data = plot_data,
-                           aes(x = factor(R0), y = log10(max_time/7))) +
-  #annotate("rect", xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = log10(2), fill = "gray", alpha = 0.5) +
-  geom_boxplot(fill = alpha("grey", 0.75)) +
-  scale_x_discrete(expression(paste(R[0]))) +
-  scale_y_continuous("Weeks", breaks = log10(c(1:9/10, 1:10, 10 * 2:4)),
-                     labels = c(rep("", 2), 0.3, rep("", 6), 1, rep("", 8), 10, rep("", 2), 40)) +
-  #geom_hline(aes(yintercept = log10(28/7)), linetype = "dashed", colour = "red") +
-  facet_wrap(~initI, ncol = 2) +
-  theme(text = element_text(size = 25),
-        strip.background = element_rect(fill = NA),
-        panel.grid.minor = element_blank(),
-        panel.grid.major = element_blank()
-        )
+#### Visually comparing distributions of observed consecutive positive swabs
 
-ggsave("~/Dropbox/CMV blips/Paper_Figures/duration_plot.pdf", duration_plot, width = 11, height = 9)
+To compare duration, we looked at how many consecutive swabs would be sampled with a random weekly swabbing routine. While this is a coarse proxy of duration, it matches how the observed data was generated where the beginning and end of infection episodes were not observed.
 
-########## FIGURE 5, consecutive samples  ###############
-load("~/Dropbox/CMV blips/Blip data analysis/Data/duration_data.RData")
+
+```{r consecutive swabs plots}
+## Duration (consecutive positives swabs) categories for duration plot
+blip_breaks = c(0,1,2,3,4, Inf)
+blip_labels = c(1,2,3,4, "5+")
+
+#### To include the observed data on the plots, initI and R0 variables need to be assigned to the observed data matching the simulation. A bit of the code below is doing this. R0 is assigned "Data" because it is on the x-axis, and the initI values are assigned to match facetting.
+
+## processing the duration calculations from the observed infections
 duration_data = blip_data_duration_complete %>% group_by(total_blips) %>%
   summarize(
     total = n(),
     prop = n()/dim(blip_data_duration_complete)[1])
+
+# for combining with simulated duration
 bind_duration_data = data.frame(
   R0 = "Data",
   total_blips = as.character(duration_data$total_blips),
-  initI = rep(c(1, 3, 7, 10), each = length(duration_data$prop)),
+  initI = rep(initI_plot_range, each = length(duration_data$prop)),
   prop = duration_data$prop
 )
 
-blip_breaks = c(0,1,2,3,4, Inf)
-blip_labels = c(1,2,3,4, "5+")
 bind_duration_data$total_blips = factor(bind_duration_data$total_blips, levels = 1:5,
                                         labels = blip_labels)
 
-sim_duration_data = filter(sim_blips_lag_obs,  round(R0, 2) %in% c(1.1, 1.3, 1.5) & (initI %in% c(1, 3, 7, 10))) %>%
-  group_by(R0, initI) %>% mutate(total = n(), total_blips_raw = consecutive_blips, #as a check
-                                 total_blips = cut(consecutive_blips, breaks = blip_breaks, labels = blip_labels)) %>%
-  ungroup() %>% mutate(R0 = factor(R0, levels = c("Data", "1.1", "1.3", "1.5"), ordered = T)) %>%
+
+# calculation proportions of consecutive swab distributions from simulated data
+sim_duration_data = filter(sim_blips_lag_obs, 
+                           round(R0, 2) %in% r0_plot_range & 
+                             (initI %in% initI_plot_range)) %>%
+  group_by(R0, initI) %>% 
+  mutate(
+    total = n(), 
+    total_blips_raw = consecutive_blips, #as a check
+    total_blips = cut(consecutive_blips, breaks = blip_breaks, labels = blip_labels)) %>%
+  ungroup() %>% 
+  mutate(
+    R0 = factor(R0, levels = c("Data", as.character(r0_plot_range)), ordered = T)
+    ) %>%
   group_by(R0, initI, total_blips) %>%
   summarize(prop = n()/unique(total)) 
-  
-sim_duration_plot_data = bind_rows(sim_duration_data, bind_duration_data)
-sim_duration_plot_data$R0 = factor(sim_duration_plot_data$R0, levels = c("Data", "1.1", "1.3", "1.5"), ordered = T)
 
-sim_duration_plot_data$icat = factor(sim_duration_plot_data$initI, levels = c(1,3,7,10),
+# combined simulations and observed data  
+sim_duration_plot_data = bind_rows(sim_duration_data, bind_duration_data)
+
+
+# processing for plot
+sim_duration_plot_data$R0 = factor(sim_duration_plot_data$R0, 
+                                   levels = c("Data", as.character(r0_plot_range)), 
+                                   ordered = T)
+
+#Ilabels made above
+sim_duration_plot_data$icat = factor(sim_duration_plot_data$initI, levels = initI_plot_range,
                                labels =c( Ilabels))
 
+#this manipulation is to make the order how I want it (1->5+ from bottom up)
 sim_duration_plot_data$total_blips = factor(sim_duration_plot_data$total_blips,
                                 levels = rev(sort(unique(sim_duration_plot_data$total_blips))))
 
-consecutive_plot_raw = ggplot(data = sim_duration_plot_data, 
+ggplot(data = sim_duration_plot_data, 
                               aes(x = R0, y = prop, fill = total_blips)) +
   geom_bar(stat = "identity", colour = "black") +
   scale_x_discrete(expression(paste(R[0])), drop = F) +
@@ -255,94 +253,23 @@ consecutive_plot_raw = ggplot(data = sim_duration_plot_data,
   scale_fill_brewer("Total consecutive positive samples (weekly)", palette="OrRd", 
                     breaks = rev(levels(sim_duration_plot_data$total_blips)),
                     direction = -1) +
-  scale_y_continuous("Proportion of transient infections",  breaks = 0:4/4, expand = c(0,0)) 
-
-consecutive_plot = consecutive_plot_raw +
+  scale_y_continuous("Proportion of transient infections",  breaks = 0:4/4, expand = c(0,0)) +
   theme(
     legend.position = "top",
     legend.text = element_text(size = 12),
     legend.title = element_text(size = 14),
     legend.key.size = unit(0.5, "lines"),
     text = element_text(size = 18),
-    axis.text.x = element_text(angle = 90, vjust = 0.5, colour = c("red", rep("black",12))))
+    axis.text.x = element_text(angle = 90, vjust = 0.5, colour = c("red", rep("black",12)))
+    )
+```
 
 
-ggsave("~/Dropbox/CMV blips/Paper_Figures/consecutive_plot.pdf", consecutive_plot, width = 9, height = 7)
+#### Statistical comparisons between distributions of consecutive positive swabs
 
-########## New FIgure 4, combines old figure 4 and 5 ############
+Because this is a multinomial distribution, it is not necessarily easy to visually compare each individual  category between the observed data and the simulated data. We used the G-test deviance statistics as an aggregate measure of comparison. Loess curves through the deviance across R0 and initial I depict the general trend: generally the least deviance was observed at lower initial infected cells.
 
-duration_data_pl = duration_data %>% 
-  mutate(R0 = "Data", initI = "data", total_blips = factor(total_blips, levels = blip_labels)) %>%
-  bind_rows(ungroup(sim_duration_data) %>% mutate(initI = as.character(initI)))
-
-duration_data_pl$icat = factor(duration_data_pl$initI, levels = c("data",1,3,7,10),
-                       labels =c("Data", Ilabels))
-duration_data_pl$total_blips = factor(duration_data_pl$total_blips, 
-                                      levels = rev(levels(duration_data_pl$total_blips)))
-
-
-bc_theme = theme(text = element_text(size = 10),
-                 strip.text = element_text(size = 10),
-                 panel.grid.minor = element_blank(),
-                 axis.title.y = element_text(size = 9),
-                 axis.title.x = element_text(size = 10),
-                 axis.text.x = element_text(size = 10)) 
-
-fig5_data = ggplot(data = subset(duration_data_pl, R0 == "Data"),
-                   aes(x = R0, y = prop, fill = total_blips, order = total_blips)) +
-  geom_bar(stat = "identity", colour = "black") +
-  scale_x_discrete("", drop = T) +
-  scale_fill_brewer("Total consective positive samples (weekly)", palette="OrRd", 
-                    breaks = rev(levels(duration_data_pl$total_blips)),
-                    direction = -1, guide = F) +
-  scale_y_continuous("Proportion of transient infections",  breaks = 0:4/4, expand = c(0,0)) +
-  facet_grid(.~icat,scales = "free_x", labeller = label_parsed) + bc_theme +
-  theme(axis.ticks.x = element_blank(), axis.text.x = element_blank())
-
-
-fig5_sim = ggplot(data = subset(duration_data_pl, R0 != "Data"),
-                  aes(x = R0, y = prop, fill = total_blips, order = total_blips)) +
-  geom_bar(stat = "identity", colour = "black") +
-  scale_x_discrete(expression(paste(R[0])), drop = T) +
-  scale_fill_brewer("Total consective positive samples (weekly)", palette="OrRd", 
-                    breaks = rev(levels(duration_data_pl$total_blips)),
-                    direction = -1) +
-  scale_y_continuous("",  breaks = 0:4/4, expand = c(0,0)) +
-  facet_wrap(~icat, labeller = label_parsed, scales = "free_y", nrow = 1) +
-  bc_theme + theme( axis.text.y = element_blank())
-
-legend_theme = theme(
-    legend.position = "top",
-        legend.text = element_text(size = 8),
-        legend.title = element_text(size = 9),
-        legend.key.size = unit(0.5, "lines")) 
-
-mylegend = gtable::gtable_filter(ggplot_gtable(ggplot_build(fig5_sim + legend_theme)), "guide-box")
-
-
-fig5_pre = plot_grid(fig5_data, fig5_sim+theme(legend.position = "none"), nrow = 1, rel_widths = c(1,4), align = "h")
-fig5 = plot_grid(mylegend, fig5_pre, nrow = 2, rel_heights = c(1, 11))
-
-
-new_fig4 = plot_grid(fig4+bc_theme, consecutive_plot_raw + bc_theme + legend_theme , 
-                     nrow = 2, labels = c("A", "B"), label_size = 10)
-
-
-bitmap("figure4_new.tiff", 
-        height = 5, width = 6.8, units = 'in', type="tiff24nc", res=300)
-new_fig4 
- dev.off()
-
-file.rename(from = paste0(getwd(), "/figure4_new.tiff"),  
-            to = "~/Dropbox/CMV blips/writeup/jvi_revisions/figures/figure4_new.tiff")
-
-
-fig5_pre = plot_grid(fig5_data, fig5_sim+theme(legend.position = "none"), nrow = 1, rel_widths = c(1,4), align = "h")
-fig5 = plot_grid(mylegend, fig5_pre, nrow = 2, rel_heights = c(1, 11))
-
-
-
-
+```{r GOF}
 
 ########### Goodness of fit duration ###############
 g_test = function(obs, e_prob){
@@ -355,6 +282,7 @@ g_test = function(obs, e_prob){
   #sum((obs - expected)^2/expected)
 }
 
+#across all of the R0 values now, not just 3 
 full_sim_duration_data = subset(sim_blips_lag_obs, initI <= 10) %>% 
   group_by(R0, initI) %>% 
   mutate(
@@ -370,152 +298,75 @@ full_sim_duration_data = subset(sim_blips_lag_obs, initI <= 10) %>%
       mutate(total_blips = factor(total_blips, levels = 1:5, labels = blip_labels))
     , by = c("total_blips")
   ) 
-full_sim_duration_data$total[full_sim_duration_data$total_blips == "5+"] = 0
-test = subset(full_sim_duration_data, initI == 6 & round(R0,2) == 2)
 
+#this assigns the total observed transient infections from NA to 0 (there were none observed)
+full_sim_duration_data$total[full_sim_duration_data$total_blips == "5+"] = 0
+
+#calculate the gstat deviance for each level
 fitted_duration = full_sim_duration_data %>%
   group_by(R0, initI) %>%
   summarize(g_stat = g_test(total, prop))
 
-
-fitted_duration_raw = ggplot(data = subset(fitted_duration,  round(R0, 2) %in% c(1.1, 1.2, 1.3, 1.4, 1.5)),
+ggplot(data = subset(fitted_duration, 
+                     round(R0, 2) %in% c(1.1, 1.2, 1.3, 1.4, 1.5)),
        aes(x = initI, y = g_stat, colour = factor(R0))) +
   geom_smooth(method = "loess", se= F) +
   ylab("Deviance from observed duration") +
   coord_cartesian(ylim = c(0, 100)) +
   geom_point() +
   scale_x_continuous(expression(paste(I[0])), breaks = 1:10) +
-  scale_color_discrete(expression(paste(R[0])))
-
-fitted_duration_pl = fitted_duration_raw +
+  scale_color_discrete(expression(paste(R[0]))) +
     theme(legend.position = c(0,1),
           legend.justification = c(-0.2,1.1),
           legend.background = element_rect(colour = "black"))
 
-
-legend_theme_dev = theme(
-        legend.text = element_text(size = 8),
-        legend.title = element_text(size = 9),
-        legend.key.size = unit(0.5, "lines"))
-
-new_fig4_alt = plot_grid(fig4+bc_theme, 
-                         plot_grid(
-                           consecutive_plot_raw + bc_theme + legend_theme +
-                      theme(axis.text.x = element_text(size = 10, angle = 90)),
-                      fitted_duration_raw + bc_theme+legend_theme ,nrow = 1,
-                      labels = c("B", "C"), label_size = 10, rel_widths = c(8,4)),
-                     nrow = 2, labels = c("A"), label_size = 10)
-
-bitmap("figure4_alt_new.tiff", 
-        height = 5, width = 6.8, units = 'in', type="tiff24nc", res=300)
-new_fig4_alt
- dev.off()
-
-file.rename(from = paste0(getwd(), "/figure4_alt_new.tiff"),  
-            to = "~/Dropbox/CMV blips/writeup/jvi_revisions/figures/figure4_alt_new.tiff")
+```
 
 
-########### Duration with full R0 data ########################
-r0_breaks = seq(1, 2.2, by = 0.05)
-sim_duration_data_allR0 = filter(sim_blips_lag_obs, R0 < 2 & (initI %in% c(1, 3, 7, 10))) %>%
-  mutate(R0_cat = cut(R0, breaks = r0_breaks, labels = (r0_breaks[-1] - diff(r0_breaks)/2))) %>%
-  group_by(R0_cat, initI) %>% mutate(total = n(), total_blips_raw = consecutive_blips, #as a check
-                                 total_blips = cut(consecutive_blips, breaks = blip_breaks, labels = blip_labels)) %>%
-  group_by(R0_cat, initI, total_blips) %>%
-  summarize(prop = n()/unique(total)) 
+## Some additional figures
 
-sim_duration_data_allR0$R0num = as.numeric(as.character(sim_duration_data_allR0$R0_cat))
+Boxplots of simulated duration.
 
-data_line = subset(duration_data_pl, R0 == "Data") %>% select(-initI)
+```{r duration boxplots}
 
-ggplot(data = sim_duration_data_allR0, aes(x = R0num, y = prop, colour = total_blips)) +
-  geom_line() +
-  geom_hline(data = data_line, 
-             aes(yintercept = prop, color = total_blips), linetype = "dashed") +
-  facet_wrap(~initI, nrow = 1) +
-  theme(legend.position = "top")
+#plot_data was created in the viral load chunk
 
+plot_data$wks =  plot_data$max_time/7
 
-########### Figure 5 ALT, adds data in #########################
+ggplot(data = plot_data, aes(x = factor(R0), y = wks)) +
+  geom_boxplot(fill = "white") +
+  scale_x_discrete(expression(paste(R[0])), drop = F) +
+  scale_y_log10("Weeks", breaks = c(0.2, 0.5, 1, 2, 5, 10, 40), limits = c(0.2, 40)) +
+  facet_wrap(~icat, nrow = 1, labeller = label_parsed) +
+  theme(text = element_text(size = 18))
 
-#get actual blips
-swab_shift = c((13 + 1)/2, #one total, just midpoint
-               ((20 - 8) - 7)/2,  #two total, midpoint - 7
-               ((27 - 15) - 7)/2, #etc.
-               ((27 - 15) - 7)/2)
-
-real_data = blip_only_data_CMV %>% group_by(PatientID, blip_no) %>% 
-  mutate(total_swabs = n(),
-         group_name = paste(PatientID, blip_no, sep = ""),
-         V = 10 ^ count,
-         days2 = days - min(days) 
-  ) %>%
-  filter(total_swabs < 5) %>%
-  group_by(total_swabs) %>%
-  mutate(time = days2 + swab_shift[total_swabs])
-
-#combine with earlier, from simple_stochastic_simulation_latent - use this sim data
-load("~/Dropbox/CMV blips/duration_figure_data_i01_simdataonly.RData")
+```
 
 
+Comparing the stochastic burnout probability between the stochastic ODE to the agent based spatial model. The estimated probability is calculated as 1-1/R0. The ODE shows some deviance because it assumes there is no depletion of the susceptible cell population.
 
-getPalette1 = colorRampPalette(RColorBrewer::brewer.pal(9, "Greys")[3:7])
-getPalette2 = colorRampPalette(RColorBrewer::brewer.pal(8, "Spectral"))
-duration_plot_fun = function(sim_data, data){
-  colourCount1 = length(unique(sim_data$run))
-  colourCount2 = length(unique(data$group_name))
-  
-  ggplot(data = sim_data, aes(x = time, y = log10(V))) +
-    geom_line(aes(colour = factor(run)), alpha = 0.5, linetype = "dashed") +
-    scale_x_continuous("Simulation time", limits = c(0, 35), breaks = 0:7 * 5) +
-    scale_y_continuous(cmv_title, limits = c(0, 6), breaks = 0:6) +
-    geom_point(data = data, aes(colour = factor(group_name)), size = 3, alpha = 0.8) +
-    geom_line(data = data, aes(colour = factor(group_name)), size = 1.5, alpha = 0.8) +
-    scale_colour_manual(values = c(getPalette2(colourCount2), getPalette1(colourCount1))) +
-    theme(
-      #text = element_text(size = 16),
-      legend.position = "none",
-      axis.title.y = element_text(size = 14))
-}
+```{r ABM comparison}
 
-duration_pl_list = plyr::llply(1:4, function(i) 
-  duration_plot_fun(subset(sim_blips_all, total_swabs == i), subset(real_data, total_swabs == i)))
-
-duration_pl = plot_grid(plotlist = duration_pl_list, nrow = 2, labels = LETTERS[2:5])
-
-combined_cons_pl = plot_grid(consecutive_plot, duration_pl, labels = "A")
-
-ggsave("~/Dropbox/CMV blips/Paper_Figures/combined_consecutive.pdf", combined_cons_pl, width = 12, height = 8)
+abm_data = readr::read_csv("model-data/abm_data.csv") %>%
+  select(R0, `percent runs ongoing`) %>% 
+  rename(blip_prob = `percent runs ongoing`) %>% 
+  mutate(blip_prob = 100 - blip_prob, model = "Spatial")
 
 
-duration_alt = plot_grid(plotlist = duration_pl_list, nrow = 2, labels = LETTERS[1:4])
-ggsave("~/Dropbox/CMV blips/Paper_Figures/duration_examples.pdf", duration_alt, width = 8, height = 8)
-
-
-
-####figure 8, second version
-#fig8 = cowplot::plot_grid(consecutive_plot, example_duration, nrow = 1, labels = LETTERS[1:2], rel_widths = c(10, 8), align = "v")
-
-# fig8 = ggdraw() +
-#   draw_plot(consecutive_plot, 0, 0, 0.65, 1) +
-#   draw_plot(example_duration, 0.65, 0.1, .35, 0.7) +
-#   draw_plot_label(c("A", "B"),  c(0, 0.65), c(1, 0.85))
-# 
-
-########## Supplementary figure, comparison to ABM ################
-
-dave_data = readr::read_csv("~/Dropbox/CMV blips/Stochastic model analysis/Batch_code/Batch_data/revised_r0.csv") %>%
-  select(R0, `percent runs ongoing`) %>% rename(blip_prob = `percent runs ongoing`) %>% mutate(blip_prob = 100 - blip_prob, model = "Spatial")
-
-prob_data = subset(sim_blip_rate_lag, initI == 1) %>% select(R0, blip_prob) %>%
+#combining the two simulated data sets, all using initial I = 1
+prob_data = subset(sim_blip_rate_lag, initI == 1) %>% 
+  select(R0, blip_prob) %>%
   mutate(blip_prob = blip_prob * 100, model = "Stochastic ODE") %>%
-  bind_rows(dave_data)
+  bind_rows(abm_data)
+
+#calculated burnout rate
 est_data = data.frame(R0 = seq(1, 2, 0.1), blip_prob = 100 * 1/seq(1, 2, 0.1), model = "calc")
 
+#plot labels
 prob_data$R02 = ifelse(prob_data$model == "Spatial", prob_data$R0 * (4.5/5.5), prob_data$R0)
 est_data$R02 = est_data$R0
 
-blip_prob_correct_raw = ggplot(data = prob_data, aes(x = R02, y = blip_prob/100, colour = model, linetype = model)) +
+ggplot(data = prob_data, aes(x = R02, y = blip_prob/100, colour = model, linetype = model)) +
   geom_line(data = est_data) +
   geom_line() +
   scale_x_continuous(expression(paste(R[0])), breaks = 1 + 0:4/4, limits = c(1, 2.05), 
@@ -527,37 +378,11 @@ blip_prob_correct_raw = ggplot(data = prob_data, aes(x = R02, y = blip_prob/100,
                       breaks = c(unique(prob_data$model), "calc"),
                       labels = c(unique(prob_data$model), expression(paste("1/R"[0])))) +
   scale_linetype_discrete("Model: ", breaks = c(unique(prob_data$model), "calc"),
-                          labels = c(unique(prob_data$model), expression(paste("1/R"[0])))) 
-
-blip_prob_correct = blip_prob_correct_raw+
+                          labels = c(unique(prob_data$model), expression(paste("1/R"[0])))) +
   theme(text = element_text(size = 16), legend.position = "top")
 
 
 
-ggsave("~/Dropbox/CMV blips/Paper_Figures/blip_prob_plot.pdf", blip_prob_correct, width = 6, height= 6)
-ggsave("~/Dropbox/CMV blips/writeup/jvi_revisions/figures/model_comparision_plot.pdf", blip_prob_correct, width = 6, height= 6)
-
-sfig4 = blip_prob_correct_raw +bc_theme + theme(
-  legend.position = "top",
-  legend.text = element_text(size = 8),
-  legend.title = element_text(size = 9))
-
-bitmap("supp_figure_4.tiff", 
-       height = 3, width = 3.2, units = 'in', type="tiff24nc", res=300)
-sfig4 
-dev.off()
-
-file.rename(from = paste0(getwd(), "/supp_figure_4.tiff"),  
-            to = "~/Dropbox/CMV blips/writeup/jvi_revisions/figures/supp_figure_4.tiff")
-
-
-########## R0 among infections #################
-infection_r0_sim = subset(stochastic_sim_latency_I, initI == 1 & R0 == 1.3 & !last_V == 0)
-summary(log(infection_r0_sim$max_V)/infection_r0_sim$max_time)
-
-#r = beta - gamma
-#beta = gamma + r
-#r0 = beta/gamma = gamma + r / gamma
-
 
 ```
+
