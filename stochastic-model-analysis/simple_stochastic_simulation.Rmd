@@ -1,0 +1,103 @@
+---
+title: "Simple CMV transient infection stochastic model simulations"
+output: html_document
+---
+
+Generate some example time series, look and plot some basic characteristics. Also look at some aggregate features of some longer simulations. 
+
+```{r load data and packages, echo = F, warning = F, message = F}
+library(plyr)
+library(dplyr)
+library(deSolve)
+library(ggplot2)
+#library(gtable)
+library(cowplot)
+theme_set(theme_bw())
+
+
+source("stochastic_model.R")
+source("stochastic_parameters.R")
+#load("../data-analysis/data/blip_data_duration.RData")
+
+```
+
+
+```{r parameter setup}
+times = seq(0, 500, 0.1)
+cmv_title = expression(paste("Log"[10], " CMV DNA copies/swab"))
+general_title = expression(paste("Simulated log"[10], " CMV viral load"))
+```
+
+# Simulate some examples
+
+Simulate stochastic models with a few different R0 and initial I values. Also look at deterministic model trajectory. The code for simulation is in this section.
+
+Here, we simulate at 75 day infections for combinations of R0 = 1.05 and 1.5 (determines the $\beta$ coefficient) and initial I = 1 and 10 (initial infected cells with replicated virus).
+
+```{r example sims deterministic model}
+parms_latent$beta = betas_latent[1] #R0 = 1.05
+parms_latent$beta = betas_latent[2]
+
+#print R0
+with(parms_latent, beta * K * p/(c * delta *(1+mu/alpha)))
+
+
+determ_model = ldply(c(1, 10), function(i0){
+  ldply(c(1.05, 1.5), function(r0){
+    parms_latent$beta = r0/with(parms_latent, p * K/ (c * delta *(1+mu/alpha)))
+    initial = c(S = parms_latent$K, I0 = 0, I = i0, V = 0)
+    x = as.data.frame(lsoda(initial, times, CMVModel_latent_ode, parms_latent))
+    x$R0 = r0
+    x$initI = i0
+    x
+  })
+})
+```
+
+```{r example sims of the stochastic model}
+
+set.seed(10)
+example_runs = ldply(c(1, 10), function(i0){
+  ldply(c(1.05, 1.5), function(r0){
+    ldply(1:50, function(i){
+      parms_latent$beta =  r0/with(parms_latent, p * K/ (c * delta *(1+mu/alpha)))
+      out = stochastic_model_latent_I(75, parms_latent, initI = i0)
+      out$run = i
+      out$initI = i0
+      out$R0 = r0
+      out
+    })
+  })
+})
+
+
+```
+
+## Plot the examples
+
+```{r plot the data, warning = F, message = F}
+
+example_sim = ggplot(data = example_runs, 
+                         aes(x = time, y = log10(V + 1))) +
+  theme(legend.position = "none") +
+  scale_x_continuous("Days", limits = c(0, 50)) +
+  scale_y_continuous(general_title, limits = c(0, 8), breaks = 0:9) +
+  facet_grid(R0 ~ initI)  +
+  geom_line(aes(colour = factor(run))) +
+  geom_line(data = determ_model, colour = "blue") +
+  theme(text = element_text(size = 22), 
+        strip.background = element_rect(fill = NA),
+        axis.line = element_line(colour = "black"),
+        plot.margin=unit(c(0, 0, 0, 0), "lines"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1))
+
+
+top_title <- ggdraw() + draw_label(expression(paste("Initial infected cells (I"[0], ")")))
+left_title <- ggdraw() + draw_label(expression(paste("R"[0])), angle = 270, hjust = 1)
+
+
+out1 = plot_grid(example_sim , left_title, ncol=2, rel_widths=c(1, .1)) 
+plot_grid(top_title, out1, ncol=1, rel_heights=c(0.1, 1))
+
+
+```
