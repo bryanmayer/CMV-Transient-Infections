@@ -1,7 +1,9 @@
 ---
 title: "CMV transient infection descriptives"
-output: html_document
+output: pdf_document
+toc: true
 ---
+
 This file does the descriptive analysis of the CMV transient infections (blips):    
 1)Look at an example    
 2)Look at the duration    
@@ -15,7 +17,11 @@ library(ggplot2)
 library(cowplot)
 library(scales)
 library(knitr)
+library(xtable)
 theme_set(theme_bw())
+
+options(xtable.comment = FALSE)
+options(xtable.include.rownames = FALSE)
 
 load("data/infected_blip_data.RData")
 load("data/duration_data.RData")
@@ -119,10 +125,12 @@ example_plot2 = example_plot2_raw +
 
 ```
 
+\clearpage
+
 ##2. Analyze duration times
 
 ### All blips
-```{r duration plot all, echo=FALSE}
+```{r duration table all, echo=FALSE, results="asis"}
 #breakdown of censored durations
 duration_data_all = blip_data_duration %>% ungroup() %>% mutate(total_episodes = n()) %>% 
   group_by(total_blips) %>%
@@ -132,7 +140,10 @@ duration_data_all = blip_data_duration %>% ungroup() %>% mutate(total_episodes =
     prop = total_duration/total
     )
 
-duration_data_all %>% kable()
+print(xtable(duration_data_all))
+```
+
+```{r duration plot all, echo=FALSE, results="asis"}
 
 duration_pl_all = ggplot(data = duration_data_all, aes(x = total_blips, y = prop)) +
   geom_bar(stat = "identity", fill = "black") +
@@ -151,7 +162,7 @@ duration_pl_all
 
 
 ### Using censoring rules
-```{r duration plot, echo=FALSE}
+```{r duration table, echo=FALSE, results="asis"}
 #breakdown of censored durations
 duration_data = blip_data_duration_complete %>% ungroup() %>% mutate(total_episodes = n()) %>% 
   group_by(total_blips) %>%
@@ -161,8 +172,10 @@ duration_data = blip_data_duration_complete %>% ungroup() %>% mutate(total_episo
     prop = total_duration/total
     )
 
-duration_data %>% kable()
+print(xtable(duration_data))
+```
 
+```{r duration plot, echo=FALSE, results="asis"}
 duration_pl_raw = ggplot(data = duration_data, aes(x = total_blips, y = prop)) +
   geom_bar(stat = "identity", fill = "black") +
   scale_x_discrete("Duration (day range)", limits = 1:4, 
@@ -179,7 +192,7 @@ duration_pl
 ```
 
 ### Look at censoring
-```{r censoring exlusions, echo = F}
+```{r censoring exlusions, echo = F, results="asis"}
 #this comes from setup_blips.R
 blip_data_duration %>% ungroup() %>%
   summarize(
@@ -189,12 +202,14 @@ blip_data_duration %>% ungroup() %>%
     gt9only = sum(max_day_diff > 9 & min_day_diff >= 5),
     both = sum(min_day_diff < 5 & max_day_diff > 9)
       ) %>%
-  kable()
+  xtable() %>% print()
 
 ```
 
+\clearpage
+
 ##3. Analyze viral load
-```{r viral load, echo=FALSE}
+```{r viral load, echo=FALSE,results="asis"}
 
 subset(swab_size_data, max_size > 0) %>% group_by(type) %>%
   summarize(
@@ -203,7 +218,11 @@ subset(swab_size_data, max_size > 0) %>% group_by(type) %>%
     median_max = median(max_size),
     IQR = paste(quantile(max_size, c(0.25, 0.75)), collapse = ", "),
     range = paste(range(max_size), collapse = ", ")
-  ) %>% kable()
+  ) %>%
+  xtable() %>% print()
+```
+
+```{r viral load plot, echo = F}
 
 #Figure 2D#
 swab_size_pl_raw = ggplot(data = subset(swab_size_data, max_size > 0), aes(x = type, y = max_size)) + geom_boxplot() +

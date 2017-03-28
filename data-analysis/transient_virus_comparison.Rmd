@@ -1,9 +1,11 @@
 ---
 title: "Comparison of transient infections across viruses and covariates"
-output: html_document
+output: pdf_document
+toc: true
 ---
 
 This file does the comparisons analysis of the CMV transient infections between other viruses, infants with primary infection or not, and with breastfeeding.
+
 1) Compare viruses       
 2) Compare by infection status    
 3) Compare by breastfeeding 
@@ -17,8 +19,11 @@ library(scales)
 library(knitr)
 library(geepack)
 library(readr)
-
+library(xtable)
 theme_set(theme_bw())
+
+options(xtable.comment = FALSE)
+options(xtable.include.rownames = FALSE)
 
 load("data/all_blip_data.RData")
 
@@ -41,7 +46,7 @@ blip_rates$blip_prop = with(blip_rates, blip_total/total_swabs)
 
 ##1.) By virus
 
-```{r viral comparisons, echo=FALSE}
+```{r viral comparisons, results="asis"}
 
 blip_rates$Virus = factor(blip_rates$Virus, ordered = T)
 blip_rates$Virus = with(blip_rates, reorder(Virus, -blip_prop))
@@ -52,7 +57,10 @@ blip_rates %>% group_by(Virus) %>% summarize(
     median = median(round(blip_prop, 2)),
     IQR = paste(quantile(round(blip_prop, 2), c(0.25, 0.75)), collapse = ", "),
     range = paste(range(round(blip_prop, 2)), collapse = ", ")
-) %>% kable()
+) %>% xtable() %>% print()
+```
+
+```{r viral comparison plot, echo = F}
 
 virus_prop_raw = ggplot(data = blip_rates,  aes(x = reorder(Virus, -blip_prop), y = blip_prop)) +
   geom_boxplot(fill = "grey") +
@@ -73,14 +81,17 @@ virus_prop
 ##2. By infant infection status
 
 ### all viruses
-```{r infant infection comparisons, echo=FALSE}
+```{r infant infection comparisons, results="asis"}
 blip_rates %>% group_by(Virus, inf_label) %>% summarize(
     total = n(),
     mean = mean(round(blip_prop, 2)),
     median = median(round(blip_prop, 2)),
     IQR = paste(quantile(round(blip_prop, 2), c(0.25, 0.75)), collapse = ", "),
     range = paste(range(round(blip_prop, 2)), collapse = ", ")
-) %>% kable()
+) %>% xtable() %>% print()
+```
+
+```{r infant infection comparisons plot, echo=FALSE}
 
 
 all_prop_raw = ggplot(data = subset(blip_rates, Virus != 'HHV8'),  aes(x = Virus, y = blip_prop, fill = inf_label)) +
@@ -103,15 +114,18 @@ all_prop
 ```
 
 ### CMV only
-```{r infant infection comparisons cmv only, echo=FALSE}
+```{r infant infection comparisons cmv only, results="asis"}
 subset(blip_rates, Virus == "CMV") %>% group_by(inf_label) %>% summarize(
     total = n(),
     mean = mean(round(blip_prop, 2)),
     median = median(round(blip_prop, 2)),
     IQR = paste(quantile(round(blip_prop, 2), c(0.25, 0.75)), collapse = ", "),
     range = paste(range(round(blip_prop, 2)), collapse = ", ")
-) %>% kable()
+) %>% xtable() %>% print()
 
+```
+
+```{r infant infection comparisons cmv only plot, echo=FALSE}
 
 CMV_prop = ggplot(data = subset(blip_rates, Virus == "CMV"),  aes(x = inf_label, y = blip_prop)) +
   geom_boxplot(fill = alpha("grey", 0.75)) +
@@ -129,7 +143,7 @@ CMV_prop
 
 Note that consecutive positives are removed.
 
-```{r bf analysis, echo = F, warning = F}
+```{r bf analysis, warning = F, results="asis"}
 ts_covariates = readr::read_csv("data/demographics_data.csv")
 
 #extract negative swabs and then start of transient infections
@@ -195,14 +209,14 @@ covariate_rates = plyr::ldply(c("breastfed", "saliva", "chewfood"), function(x) 
 })
 
 
-select(covariate_rates, var, value, everything()) %>% ungroup() %>% kable(caption="Not by patient, by positive swab status")
+select(covariate_rates, var, value, everything()) %>% ungroup() %>% xtable(caption="Not by patient, by positive swab status") %>% print()
 
-ungroup(population_rates) %>% kable(caption="Positive swab proportion by patient. (population = pooled proportion).")
+ungroup(population_rates) %>% xtable(caption="Positive swab proportion by patient. (population = pooled proportion).") %>% print()
 
 ```
 
 
-```{r episode infection breastfeeding comparison}
+```{r episode infection breastfeeding comparison, results="asis"}
 
 bf_pos_swabs_all =  subset(all_blips, Virus == "CMV") %>%
   left_join(ts_covariates, by =  c("PatientID2", "times")) %>%
@@ -233,6 +247,6 @@ all_swab_rates = bf_pos_swabs_all %>%
     blip_prop_population = sum(blip_total)/sum(total_swabs)
   )
 
-ungroup(all_swab_rates) %>% kable(caption="Positive swab proportion by all swabs. (population = pooled proportion).")
+ungroup(all_swab_rates) %>% xtable(caption="Positive swab proportion by all swabs. (population = pooled proportion).") %>% print()
 
 ```

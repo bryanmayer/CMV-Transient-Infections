@@ -1,6 +1,7 @@
 ---
 title: "CMV transient infection probability estimates"
-output: html_document
+output: pdf_document
+toc: true
 ---
 
 This looks at quantifying the probability of a blip using geometric distribution of blips
@@ -13,7 +14,11 @@ library(ggplot2)
 library(survival)
 library(cowplot)
 library(knitr)
+library(xtable)
 theme_set(theme_bw())
+
+options(xtable.comment = FALSE)
+options(xtable.include.rownames = FALSE)
 
 load("data/all_blip_data.RData")
 combine_est_interval =
@@ -44,7 +49,6 @@ pos_count_data = all_blips %>% filter((!consecutive_swab | is.na(consecutive_swa
 
 ```{r functions for estimation and bootstrap approach}
 
-
 #nls estimation of probability using cumulative distribution
 pest_fun = function(data_in){
   survm_all = survfit(Surv(time = total_blips, event = infantInfection) ~ 1,
@@ -68,7 +72,9 @@ bootstrap_fun = function(data_in){
   })
 }
 
+```
 
+```{r estimate probs, results="asis"}
 #this only reruns if it has to
 if(file.exists("data/virus_prob_est.RData")) {
   load("data/virus_prob_est.RData") 
@@ -118,12 +124,11 @@ prob_table = viral_probs %>%
 prob_table$Virus = factor(prob_table$Virus, levels = c("CMV", "EBV", "HSV", "HHV6"), ordered = T)
 
 select(prob_table, Virus, total_blips, est_out, total_blips_inf,  est_out_complete) %>%
-  arrange(Virus) %>% knitr::kable()
-
-#print(xtable(select(out_data, Virus, mle, mle_cens, surv_out)), include.rownames = F)
+  arrange(Virus) %>% xtable() %>% print()
 
 ```
 
+## Cumulative distribution plot
 
 ```{r KM estimates for cmv}
 
@@ -157,9 +162,9 @@ cmv_km = ggplot(data = arrange(cmv_surv_data, blips),
   scale_y_continuous("Cumulative incidence of primary CMV infection", breaks = 0:4/4, limits = c(0,1)) +
   scale_x_continuous("Total transient CMV infections", breaks = 0:6 * 3)
 
-cmv_km + theme(legend.position = "top") +  
-  geom_line(data = test1) +  geom_ribbon(data = test1, aes(ymin = lower, ymax = upper), alpha =0.25) +
-  geom_line(data = test2) +  geom_ribbon(data = test2, aes(ymin = lower, ymax = upper), alpha =0.25) 
+cmv_km + theme(legend.position = "top") 
+  #geom_line(data = test1) +  geom_ribbon(data = test1, aes(ymin = lower, ymax = upper), alpha =0.25) +
+  #geom_line(data = test2) +  geom_ribbon(data = test2, aes(ymin = lower, ymax = upper), alpha =0.25) 
 
 
 ```
