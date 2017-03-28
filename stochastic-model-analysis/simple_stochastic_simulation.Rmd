@@ -15,8 +15,8 @@ library(cowplot)
 theme_set(theme_bw())
 
 
-source("stochastic_model.R")
-source("stochastic_parameters.R")
+source("model-scripts/stochastic_model.R")
+source("model-scripts/stochastic_parameters.R")
 #load("../data-analysis/data/blip_data_duration.RData")
 
 ```

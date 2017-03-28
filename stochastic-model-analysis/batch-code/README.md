@@ -6,6 +6,6 @@ These are the scripts I used to run jobs on the server.
 
 3. combine_batch_data.R - a short script that I used to combine the data into a single .RData file.
 
-stochastic_model.R is available in stochastic-model-analysis/
+stochastic_model.R is available in stochastic-model-analysis/model-scripts/
 
 These scripts were run on the scicomp cluster at the Fred Hutch and are being shared for informational purposes. The final data set is large (115mb) and is uploaded to dataverse (stochastic_sim_I_latent.Rdata. TBD: add citation).
