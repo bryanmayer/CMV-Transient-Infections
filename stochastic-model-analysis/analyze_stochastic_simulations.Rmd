@@ -1,8 +1,8 @@
 ---
 title: "Analyze CMV transient infection stochastic model batch simulations"
-output: html_document
+output: pdf_document
+toc: true
 ---
-
 
 
 ```{r load packages, echo = F, warning = F, message = F}
@@ -17,7 +17,11 @@ library(gridExtra)
 library(RColorBrewer)
 library(scales)
 library(cowplot)
+library(xtable)
 theme_set(theme_bw())
+
+options(xtable.comment = FALSE)
+options(xtable.include.rownames = FALSE)
 
 cmv_title = expression(paste("Log"[10], " CMV DNA copies/swab"))
 
@@ -61,7 +65,7 @@ if("stochastic_sim_I_latent.Rdata" %in% list.files("model-data/")){
 
 These are the results from fitting the CMV infection model (deterministic ode model) to the primary infection data on just the exponential viral expansion portion of the data. [That analysis and data is available on github](https://github.com/bryanmayer/CMV-Primary-Analysis). This results file shows the fitted parameter for infection start time (relative to first positive), beta x initial susceptible cells (4e8) x 1000, and the subsequent calculation of R0.
 
-```{r results from primary model}
+```{r results from primary model, results="asis"}
 
 
 #these are the results from fitting the exponential growth portion of the model (deterministic ode) to the primary infection data (JID)
@@ -69,16 +73,16 @@ base_model_fits <- read.csv(text = getURL("https://raw.githubusercontent.com/bry
 
 r0_tab = summary(base_model_fits$R0) %>% 
   tidy() %>%
-  kable(caption = "Summary of R0 fits from primary infection model (JID paper)")
+  xtable(caption = "Summary of R0 fits from primary infection model (JID paper)")
 
 #rescaling the parameter in this results data to beta
 beta_tab = summary(1e12 * base_model_fits$beta/4e8/1e3) %>% 
   tidy() %>%
-  kable(caption = "Summary of beta fits (times 10^-12) from primary infection model (JID paper)")
+  xtable(caption = "Summary of beta fits (times 1e-12) from primary infection model (JID paper)")
 
 
-r0_tab
-beta_tab
+print(r0_tab)
+print(beta_tab)
 ```
 
 ## Summary of simulated transient infections
@@ -173,10 +177,12 @@ ggplot(data = plot_data,
   scale_y_continuous(cmv_title, limits = c(1.9, 5), breaks = 1:6) +
   facet_wrap(~icat, nrow = 1, labeller = label_parsed)
 
+```
 
+```{r table of viral load, results="asis"}
 data_size_summary[1,] %>% ungroup() %>%
   select(median_conc, lowerQR, upperQR) %>%
-  kable(caption = "Summary of observed transient infection viral load data.")
+  xtable(caption = "Summary of observed transient infection viral load data.") %>% print()
 
 ```
 

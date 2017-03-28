@@ -1,6 +1,7 @@
 ---
 title: "Simple CMV transient infection stochastic model simulations"
-output: html_document
+output: pdf_document
+toc: true
 ---
 
 Generate some example time series, look and plot some basic characteristics. Also look at some aggregate features of some longer simulations. 
@@ -10,14 +11,11 @@ library(plyr)
 library(dplyr)
 library(deSolve)
 library(ggplot2)
-#library(gtable)
 library(cowplot)
 theme_set(theme_bw())
 
-
 source("model-scripts/stochastic_model.R")
 source("model-scripts/stochastic_parameters.R")
-#load("../data-analysis/data/blip_data_duration.RData")
 
 ```
 
@@ -85,7 +83,7 @@ example_sim = ggplot(data = example_runs,
   facet_grid(R0 ~ initI)  +
   geom_line(aes(colour = factor(run))) +
   geom_line(data = determ_model, colour = "blue") +
-  theme(text = element_text(size = 22), 
+  theme(text = element_text(size = 18), 
         strip.background = element_rect(fill = NA),
         axis.line = element_line(colour = "black"),
         plot.margin=unit(c(0, 0, 0, 0), "lines"),
