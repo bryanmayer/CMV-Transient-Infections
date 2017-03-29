@@ -1,6 +1,6 @@
 # CMV-Transient-Infection-Analysis
 
-This repository contains the analysis code for "Transient oral human cytomegalovirus infections indicate inefficient viral spread from very few initially infected cells." The article has been accepted for publication in the Journal of Virology.
+This repository contains the analysis code and data for "Transient oral human cytomegalovirus infections indicate inefficient viral spread from very few initially infected cells." The article has been accepted for publication in the Journal of Virology.
 
 
 # Data locations
