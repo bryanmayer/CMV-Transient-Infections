@@ -2,10 +2,10 @@
 
 This repository contains the analysis code and data for "Transient oral human cytomegalovirus infections indicate inefficient viral spread from very few initially infected cells." 
 
-
-[http://jvi.asm.org/content/early/2017/03/30/JVI.00380-17.abstract](http://jvi.asm.org/content/early/2017/03/30/JVI.00380-17.abstract)
 Transient oral human cytomegalovirus infections indicate inefficient viral spread from very few initially infected cells.    
 Bryan T. Mayer, Elizabeth M. Krantz, David Swan, James Ferrenberg, Karen Simmons, Stacy Selke, Meei-Li Huang, Corey Casper, Lawrence Corey, Anna Wald, Joshua T. Schiffer and Soren Gantt*. 2017. Journal of Virology. Accepted 5 April 2017, doi: 10.1128/JVI.00380-17
+
+[http://jvi.asm.org/content/early/2017/03/30/JVI.00380-17.abstract](http://jvi.asm.org/content/early/2017/03/30/JVI.00380-17.abstract)    
 
 # Data locations
 
