@@ -2,7 +2,7 @@
 
 This repository contains the analysis code and data for "Transient oral human cytomegalovirus infections indicate inefficient viral spread from very few initially infected cells."  [http://jvi.asm.org/content/early/2017/03/30/JVI.00380-17.abstract](http://jvi.asm.org/content/early/2017/03/30/JVI.00380-17.abstract)    
 
-# Data locations
+## Data locations
 
 1. Transient infection data from the Ugandan infant cohort are located in [`data-analysis/data/`](https://github.com/bryanmayer/CMV-Transient-Infections/tree/master/data-analysis/data).    
 2. Simulation results are located in two locations:    
