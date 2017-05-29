@@ -12,6 +12,6 @@ This repository contains the analysis code and data for "Transient oral human cy
 
 ## Citation
 
-Bryan T. Mayer, Elizabeth M. Krantz, David Swan, James Ferrenberg, Karen Simmons, Stacy Selke, Meei-Li Huang, Corey Casper, Lawrence Corey, Anna Wald, Joshua T. Schiffer and Soren Gantt\*. "Transient oral human cytomegalovirus infections indicate inefficient viral spread from very few initially infected cells." 2017. Journal of Virology. doi: 10.1128/JVI.00380-17
+Mayer BT, Krantz EM, Swan D, Ferrenberg J, Simmons K, Selke S, Huang M-L, Casper C, Corey L, Wald A, Schiffer JT, Gantt S. 2017. Transient oral human cytomegalovirus infections indicate inefficient viral spread from very few initially infected cells. J Virol 91:e00380-17. https://doi.org/10.1128/JVI.00380-17.
 
 \* corresponding author
