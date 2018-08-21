@@ -6,7 +6,7 @@ toc: true
 
 Generate some example time series, look and plot some basic characteristics. Also look at some aggregate features of some longer simulations. 
 
-```{r load data and packages, echo = F, warning = F, message = F}
+```{r load data and packages, echo = T, warning = F, message = F}
 library(plyr)
 library(dplyr)
 library(deSolve)
